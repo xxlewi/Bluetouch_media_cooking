@@ -32,7 +32,7 @@ class Databaze_radius():
         if self.get_device_name_by_mac():
             # Uz existujici zarizeni
             if self.get_password_by_username():
-                print("existuje ucet")
+                print("Existing account")
                 
             else:
                 self.add_to_radcheck()

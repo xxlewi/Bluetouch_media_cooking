@@ -327,11 +327,23 @@ class Router():
                 elif self.version == "7.10beta5 (development)":
                     
                     #Prepinam na stable
-                    
+                    print("Dev")
                     stdin, stdout, stderr = self.client.exec_command("system package update set channel=stable") 
+                    result = stdout.read().decode()
+                    print(result)
+                    time.sleep(1)
                     stdin, stdout, stderr = self.client.exec_command("system package update check-for-updates")
+                    result = stdout.read().decode()
+                    print(result)
+                    time.sleep(1)
                     stdin, stdout, stderr = self.client.exec_command("system package update download")
+                    result = stdout.read().decode()
+                    print(result)
+                    time.sleep(1)
                     stdin, stdout, stderr = self.client.exec_command("system routerboard upgrade")
+                    result = stdout.read().decode()
+                    print(result)
+                    time.sleep(1)
                     stdin, stdout, stderr = self.client.exec_command("reboot")
                     result = stdout.read().decode()
                     print("step 5/6 - Version set to Stable")
