@@ -28,17 +28,31 @@ class Databaze_radius():
         self.dhcp_mac_mikrotik = None
         
     def create_new_acc(self):
-        self.connect()
-   
-        self.get_free_username()
-     
-        self.add_to_radcheck()
         
-        self.addgw()
+        if self.get_device_name_by_mac():
+            # Uz existujici zarizeni
+            if self.get_password_by_username():
+                print("existuje ucet")
+                
+            else:
+                self.add_to_radcheck()
         
-        self.delete_free_username()
+        else:
+            print("New Device")
+            
+            self.connect()
+    
+            self.get_free_username()
         
-        self.disconnect()
+            self.add_to_radcheck()
+            
+            self.addgw()
+            
+            self.delete_free_username()
+            
+            self.disconnect()
+
+
 
     def mac2long(self, mac):
         return int(mac.replace(':', ''), 16)
@@ -52,6 +66,36 @@ class Databaze_radius():
 
         else:
             pass
+
+
+    def get_device_name_by_mac(self):
+        self.connect_btm()
+        query = "SELECT * FROM mikrotik WHERE mac = %s"
+        self.cursor.execute(query, (self.mac2long(self.mac_address),))
+        result = self.cursor.fetchone()
+        if result is None:
+            print(f"MAC adresa {self.mac_address} není v databázi.")
+            return False
+        else:
+            self.username = result[0]
+            self.ip_address = result[4]
+            
+            print(f"Existed device: {self.username}, IP Address: {self.long2ip(self.ip_address)}, MAC address: {self.mac_address}")
+            return self.username, self.ip_address
+
+
+    def get_password_by_username(self):
+        self.connect()
+        query = "SELECT value FROM radcheck WHERE username = %s"
+        self.cursor.execute(query, (self.username,))
+        result = self.cursor.fetchone()
+        if result is None:
+            print(f"Uživatel {self.username} není v databázi.")
+            return False
+        else:
+            self.password = result[0]
+            print(f"Uživatel: {self.username}, Heslo: {self.password}")
+            return self.password
 
 
 
@@ -70,6 +114,7 @@ class Databaze_radius():
                               host='10.120.1.12',
                               database='radius')
         self.cursor = self.cnx.cursor()
+        
         
         
     def disconnect(self):
@@ -96,7 +141,7 @@ class Databaze_radius():
     def generate_password(self):
         characters = string.ascii_letters + string.digits
         self.password = ''.join(random.sample(characters, 12))
-        print(self.password)
+        # print(self.password)
         return self.password
         
     def add_to_radcheck(self):
@@ -154,6 +199,8 @@ class Databaze_radius():
         self.mac_address = self.mac_address.replace(":", "")
         cmd = f"/etc/scripts/addgw.sh make '{self.username}' '{self.mac_address}' '{self.username}:{self.password}' '{self.ip_address}' '{self.location}' '{self.model}' '{self.mikrotik_name}'"
 
+        # print(cmd)
+        
         # Spusťte příkaz na vzdáleném serveru
         stdin, stdout, stderr = ssh_client.exec_command(cmd)
         output = stdout.read().decode()
@@ -186,8 +233,8 @@ class Databaze_radius():
         # return self.id_username, self.username
 
 
-test = Databaze_radius("","")
-test.get_free_dhcp()
+# test = Databaze_radius("","")
+# test.get_free_dhcp()
 
 
 

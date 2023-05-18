@@ -12,7 +12,7 @@ router = Router(ip_router)
 
 
 
-#router.update_firmware()
+# router.update_firmware()
 router.create_and_add_vpn()
 
 

@@ -31,7 +31,7 @@ class Router():
         # self.cesta = "/home/jiri"
         
         self.local_path = f"{self.cesta}zalohy_routeru"
-        
+        self.pokracovat = True
         # Spousteni funkci
         # self.connecting()
         # self.get_ppp_interfaces()
@@ -161,12 +161,37 @@ class Router():
             # self.client.connect(hostname=self.ip_router, username='admin', password='MikroPass', port=20222, look_for_keys=False)
             self.sftp = self.client.open_sftp()
             
-            print(f"SSH session login successful {self.ip_router}")
+            print(f"SSH session login successful {self.ip_router} on port 22")
             return True
             
         except Exception as e:
             # Report login failure
-            print(f"SSH session failed on login {self.ip_router}")
+            print(f"SSH session failed on login {self.ip_router} port 22")
+            print(e)
+            return False
+        
+        
+        
+    def connecting_20222(self):
+        try:
+            # Create an SSH client
+            self.client = paramiko.SSHClient()
+
+            # Add the Mikrotik router's host key
+            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            # Connect to the Mikrotik router
+            # self.client.connect(hostname=self.ip_router, username='admin', password='', port=22, look_for_keys=False)
+            
+            self.client.connect(hostname=self.ip_router, username='admin', password='MikroPass', port=20222, look_for_keys=False)
+            self.sftp = self.client.open_sftp()
+            
+            print(f"SSH session login successful {self.ip_router} on port 20222")
+            return True
+            
+        except Exception as e:
+            # Report login failure
+            print(f"SSH session failed on login {self.ip_router} port 20222")
             print(e)
             return False
             
@@ -260,94 +285,194 @@ class Router():
 
             
     def update_firmware(self):
-        if self.connecting():
-            self.version = self.get_version()
-            # if self.version != "7.7 (stable)":
-            # print(self.version)
-            # pokracovat = input("Chces to aktualizovat?:\n")
-            # if pokracovat == "y":
-            #     upgrade        
-        try:
-            stdin, stdout, stderr = self.client.exec_command("system package update set channel=test") 
-            result = stdout.read().decode()
-            print(result)
-            if "failed" in result.lower():
-                raise Exception("Setting channel to testing failed.")
-            time.sleep(2)
+        
+        while self.pokracovat:
+            try:
+                self.connecting()
+                self.version = self.get_version()
+                if self.version == "7.9 (stable)":
+                    print(f"step 6/6 - Verze: {self.version}, Changing port and user password")
+                    
+                    stdin, stdout, stderr = self.client.exec_command("/ip service set ssh port=20222")   
+                    # Změna hesla a přidání uživatele root
 
-            stdin, stdout, stderr = self.client.exec_command("system package update check-for-updates")
-            result = stdout.read().decode()
-            print(result)
-            if "failed" in result.lower():
-                raise Exception("Checking for updates failed.")
-            time.sleep(2)
+                    stdin, stdout, stderr = self.client.exec_command(f"/user set [find name=admin] password=MikroPass")
 
-            pokracovat_v_updatu = input("Souhlasiš s upgradem?\n")
-            if pokracovat_v_updatu == "y":
-            
-                stdin, stdout, stderr = self.client.exec_command("system package update download")
-                result = stdout.read().decode()
-                print(result)
-                if "failed" in result.lower():
-                    raise Exception("Downloading updates failed.")
-                time.sleep(2)
+                    
+                    result_service = stdout.read().decode()
+                    result_service = result_service + "Heslo změneno"
+                    
+                    if "failed" in result_service.lower():
+                        raise Exception("Heslo nezměneno") 
+                    else:
+                        # print(result_service)
+                        pass
+                    
+                    
+                elif self.version == "7.9 (test)":
+                    
+                    #Prepinam na stable
+                    
+                    stdin, stdout, stderr = self.client.exec_command("system package update set channel=stable") 
 
-                stdin, stdout, stderr = self.client.exec_command("system routerboard upgrade")
-                result = stdout.read().decode()
-                print(result)
-                if "failed" in result.lower():
-                    raise Exception("Upgrading routerboard failed.")
-                time.sleep(2)
-
-                pokracovat_reboot = input("Chces Restartovat router??\n")
-                if pokracovat_reboot == "y":
-                    stdin, stdout, stderr = self.client.exec_command("reboot")
                     result = stdout.read().decode()
+                    print("step 5/6 - Version set to Stable")
                     print(result)
                     if "failed" in result.lower():
-                        raise Exception("Reboot failed.")   
-
-            print("Firmware upgraded successfully.")
-            
-        except Exception as e:
-            print("An error occurred while upgrading firmware.")
-            print(e)
-        else:
-            print(f"Neni treba upgrade, verze je: {self.version}")
-            
+                        raise Exception("Setting channel to testing failed.")
+                    time.sleep(1)
+                    self.update_firmware()
                     
+                    
+                elif self.version == "7.10beta5 (development)":
+                    
+                    #Prepinam na stable
+                    
+                    stdin, stdout, stderr = self.client.exec_command("system package update set channel=stable") 
+                    stdin, stdout, stderr = self.client.exec_command("system package update check-for-updates")
+                    stdin, stdout, stderr = self.client.exec_command("system package update download")
+                    stdin, stdout, stderr = self.client.exec_command("system routerboard upgrade")
+                    stdin, stdout, stderr = self.client.exec_command("reboot")
+                    result = stdout.read().decode()
+                    print("step 5/6 - Version set to Stable")
+                    print(result)
+                    if "failed" in result.lower():
+                        raise Exception("Setting channel to testing failed.")
+                    time.sleep(1)
+                    self.update_firmware()
+
+                        
+                else:
+        
+                    try:
+                        
+                        print("Upgrading router")
+                        
+                        stdin, stdout, stderr = self.client.exec_command("system package update set channel=test") 
+                        result = stdout.read().decode()
+                        print("step 1/6 - Version set to Test")
+                        if "failed" in result.lower():
+                            raise Exception("Setting channel to testing failed.")
+                        time.sleep(2)
+
+                        stdin, stdout, stderr = self.client.exec_command("system package update check-for-updates")
+                        result = stdout.read().decode()
+                        print("step 2/6 - Checked for updates")
+                        print(result)
+                        if "failed" in result.lower():
+                            raise Exception("Checking for updates failed.")
+                        time.sleep(2)
+                        
+                        stdin, stdout, stderr = self.client.exec_command("system package update download")
+                        result = stdout.read().decode()
+                        print("step 3/6 - Updates downloaded")
+                        print(result)
+                        if "failed" in result.lower():
+                            raise Exception("Downloading updates failed.")
+                        time.sleep(2)
+
+                        stdin, stdout, stderr = self.client.exec_command("system routerboard upgrade")
+                        result = stdout.read().decode()
+                        print("step 4/6 - Router upgraded. Going to reboot")
+                        print(result)
+                        
+                        if "failed" in result.lower():
+                            raise Exception("Upgrading routerboard failed.")
+                        
+                        else: 
+                            # reboot
+                            stdin, stdout, stderr = self.client.exec_command("reboot")
+                        
+                        time.sleep(10)
+                        
+                        
+                    except Exception as e:
+                        print("An error occurred while upgrading firmware.")
+                        print(e)
 
 
 
+
+                    
+            except:
+                
+                
+                    print("Could not connect on port 22")
+                    # self.unconnect()
+                    
+                    time.sleep(2)
+                    
+                    print("Trying to connect on port 20222")
+                    if self.connecting_20222():
+                        
+
+                        
+                        # brzda = input("Upgrade finished, do you want to install the Router? (NO, n , N)\n")
+                        # if brzda == "NO" or brzda == "N" or brzda == "n":
+                        #     self.pokracovat = False
+                        #     return self.pokracovat 
+                            
+                            
+                        self.version = self.get_version()
+                        
+                        self.create_and_add_vpn()
+                       
+                        self.pokracovat = False
+                        return self.pokracovat 
+                    
+                    else:
+                        print("Error on connecting to port 20222")
+
+
+                    input
+                    print("Error, I am trying again in 10s..")
+                    time.sleep(10)
+                    self.update_firmware()
+
+
+                
+    # def check_name(self):
+        
+    #     if self.connecting_20222():
+                
+    #         try:
+    #             # Vytvoreni VPN
+    #             databaze = Databaze_radius(self.get_mac_address(), self.get_device_name())
+                
+    #             databaze.get_device_name_by_mac()
+        
+    #         except:
+    #             print("nepovedlo se")
 
             
             
     def create_and_add_vpn(self):
         try:
-            if self.connecting():
+            if self.connecting_20222():
                 
                 try:
                     # Vytvoreni VPN
                     databaze = Databaze_radius(self.get_mac_address(), self.get_device_name())
                  
-                   
+                    # databaze.get_device_name_by_mac()
                     databaze.create_new_acc()  ##### Pozor přepíše to všechno
                     
                     # print("debug 2")
-                    # stdin, stdout, stderr = self.client.exec_command(f"/interface ovpn-client remove [find]")
+                    stdin, stdout, stderr = self.client.exec_command(f"/interface ovpn-client remove [find]")
+                    time.sleep(2)
                     stdin, stdout, stderr = self.client.exec_command(f"/interface ovpn-client add name=BTM-CENTRAL connect-to=95.80.221.210 port=1194 mode=ip protocol=udp user={databaze.username} password={databaze.password} profile=default tls-version=any auth=sha1 cipher=aes256-cbc use-peer-dns=yes disconnect-notify=yes")
                     # print("debug 3")
                     result_vpn = stdout.read().decode()
                     # print("debug 4")
-                    result_vpn = result_vpn + "VPN vytvorena"
+                    result_vpn = "install step 1 - OK - " + result_vpn + "VPN created"
                     if "failed" in result_vpn.lower():
-                        raise Exception("1/x - VPN was not added.")
+                        raise Exception("install step 1 - ERR - VPN was not added.")
                     else:
                         print(result_vpn)
                     time.sleep(2)
                     
                 except:
-                    print("1/x - Nepovedlo se vytvořit VPN")
+                    print("install step 1 - ERR - Could not created VPN")
                 
                 
                 
@@ -378,9 +503,9 @@ class Router():
                     # Ověření existence souboru na vzdáleném serveru
                     try:
                         sftp.stat(file_path)
-                        result_ccd = f"2/x - Soubor {file_path} byl úspěšně vytvořen."
+                        result_ccd = f"install step 2 - OK - File {file_path} was created."
                     except FileNotFoundError:
-                        result_ccd = f"2/x - Vytvoření souboru {file_path} se nezdařilo."
+                        result_ccd = f"install step 2 - ERR-  File {file_path} was not created"
 
                     # Ukončení spojení a výpis výsledku
                     sftp.close()
@@ -389,7 +514,7 @@ class Router():
                     time.sleep(2)
                     
                 except:
-                    print(f"2/x - Nevytvořil jsem CCD - chyba: {result_ccd}")
+                    print(f"install step 2 - ERR - I did not created CCD file - ERROR: {result_ccd}")
 
                 
                 
@@ -399,31 +524,33 @@ class Router():
                     stdin, stdout, stderr = self.client.exec_command("/")
                     stdin, stdout, stderr = self.client.exec_command("/ip route add dst-address=10.100.0.0/24 gateway=BTM-CENTRAL vrf-interface=BTM-CENTRAL distance=1 scope=30 target-scope=10 routing-table=main")
                     result_route = stdout.read().decode()
-                    result_route = "3/x - " + result_route + "Routy byly pridany"
+                    result_route = "install step 3 - OK - " + result_route + "Routes was added"
                     if "failed" in result_route.lower():
-                        raise Exception("3/x - Add route failed.") 
+                        raise Exception("install step 3 - ERR - Routes wasnt added.") 
                     else:
                         print(result_route)
                     time.sleep(2)
                     
                 except:
-                    print("3/x - total-  Add route failed.")
+                    print("install step 3 - ERR - Add route failed.")
                     
                 
                 
                 try:
                     
+                    # # Odstranění existujícího záznamu
+                    # stdin, stdout, stderr = self.client.exec_command("/interface list member remove [find interface=BTM-CENTRAL list=LAN]")
                     # Pridani interface do LAN
                     stdin, stdout, stderr = self.client.exec_command("/interface list member add interface=BTM-CENTRAL list=LAN")
                     result_interface = stdout.read().decode()
-                    result_interface = "4/x - " + result_interface + "Pridana interface do LAN "
+                    result_interface = "install step 4 - OK - " + result_interface + "Interface BTM-CENTRAL was added to LAN"
                     if "failed" in result_interface.lower():
-                        raise Exception("4/x - Add interface failed.") 
+                        raise Exception("install step 4 - ERR - Add interface BTM-CENTRAL to lan was failed.") 
                     else:
                         print(result_interface)
                     time.sleep(2)
                 except:
-                    print("4/x - Add interface failed.")
+                    print("install step 4 - ERR -: Add interface failed.")
                 
                 
                 try:
@@ -433,16 +560,16 @@ class Router():
                     stdin, stdout, stderr = self.client.exec_command(f"/ip service set www address=10.100.0.0/24,{self.ip_router_mask},192.168.207.0/24")
                     stdin, stdout, stderr = self.client.exec_command(f"/snmp set enabled=yes trap-version=2 location={self.device_name}")
                     result_service = stdout.read().decode()
-                    result_service = "5/x - " + result_service + "Sluzby byly spusteny"
+                    result_service = "install step 5 - OK - " + result_service + "Services were successfully started"
                     
                     if "failed" in result_service.lower():
-                        raise Exception("5/x - Add services failed.") 
+                        raise Exception("install step 5 - ERR - Add services failed.") 
                     else:
                         print(result_service)
                     time.sleep(2)
                     
                 except:
-                    print("5/x - total - Add services failed.")
+                    print("install step 5 - ERR - Add services failed.")
 
             
                 try:
@@ -455,27 +582,21 @@ class Router():
                     stdin, stdout, stderr = self.client.exec_command("interface wireless disable wlan1")
 
                     stdin, stdout, stderr = self.client.exec_command(f"/system identity set name={databaze.username}")
-                    print("6/x - wifi ok")
+                    print("install step 6 - OK - Wifi was successfully set")
                     
                 except:
-                    print("6/x - total - Add services failed.")
+                    print("install step 6 - ERR - Add services failed.")
 
                 
 
-                stdin, stdout, stderr = self.client.exec_command("/ip service set ssh port=20222")   
-                # Změna hesla a přidání uživatele root
-
-                stdin, stdout, stderr = self.client.exec_command(f"/user set [find name=admin] password=MikroPass")
-
-                
-                result_service = stdout.read().decode()
-                result_service = result_service + "Heslo změneno"
-                
-                if "failed" in result_service.lower():
-                    raise Exception("Heslo nezměneno") 
-                else:
-                    print(result_service)
+                #     print(result_service)
                 time.sleep(2)    
+                
+                
+                print(f"Good JOB, router is prepare for production, do not forget for printing the stick with name: {self.file_name}   #######")
+                
+                # reboot
+                stdin, stdout, stderr = self.client.exec_command("reboot")
                     
                     
                 # # Deaktivace všech existujících DHCP serverů
@@ -483,7 +604,9 @@ class Router():
                     
                     
                 # # Ukonceni sesion    
-                self.unconnect()
+                # self.unconnect()
+                
+                
             
         except:
             print(f"Nepřipojeno k {self.get_device_name()}")
