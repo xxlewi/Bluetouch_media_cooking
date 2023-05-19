@@ -10,10 +10,11 @@ from datetime import datetime
 # logging.basicConfig(level=logging.DEBUG)
 
 class Router():
-    def __init__(self, ip_router):
+    def __init__(self, ip_router, operator):
         # self.host_name = hostname
         # self.host_name = self.host_name.decode("utf-8") # převod na text
         # self.host_name = self.host_name.split("\r\n")[1] # rozdělení řetězce a získání druhého prvku
+        self.operator = operator
         self.ip_router = ip_router.strip()
         self.ip_router_mask = self.get_ip_router_mask(self.ip_router)
         self.rsc_file_name = self.ip_router.replace(".", "_") + ".rsc"
@@ -282,6 +283,18 @@ class Router():
             
         print(f"Current device name: {self.device_name}")
         return self.device_name
+    
+    def is_router_online(self):
+        try:
+            stdin, stdout, stderr = self.client.exec_command("ping -c 1 8.8.8.8")
+            result = stdout.read().decode()
+            if '1 packets transmitted, 1 received' in result:
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"Error: {e}")
+            return False
 
             
     def update_firmware(self):
@@ -291,7 +304,7 @@ class Router():
                 self.connecting()
                 self.version = self.get_version()
                 if self.version == "7.9 (stable)":
-                    print(f"step 6/6 - Verze: {self.version}, Changing port and user password")
+                    print(f"update step 6/6 - Verze: {self.version}, Changing port and user password")
                     
                     stdin, stdout, stderr = self.client.exec_command("/ip service set ssh port=20222")   
                     # Změna hesla a přidání uživatele root
@@ -316,7 +329,7 @@ class Router():
                     stdin, stdout, stderr = self.client.exec_command("system package update set channel=stable") 
 
                     result = stdout.read().decode()
-                    print("step 5/6 - Version set to Stable")
+                    print("update step 5/6 - Version set to Stable")
                     print(result)
                     if "failed" in result.lower():
                         raise Exception("Setting channel to testing failed.")
@@ -346,7 +359,7 @@ class Router():
                     time.sleep(1)
                     stdin, stdout, stderr = self.client.exec_command("reboot")
                     result = stdout.read().decode()
-                    print("step 5/6 - Version set to Stable")
+                    print("update step 5/6 - Version set to Stable")
                     print(result)
                     if "failed" in result.lower():
                         raise Exception("Setting channel to testing failed.")
@@ -358,18 +371,59 @@ class Router():
         
                     try:
                         
+                        if self.operator == "VF" or self.operator == "V" or self.operator == "v" or self.operator == "vf" or self.operator == "Vodafone" or self.operator == "vodafone":
+                            
+                            try:
+                                print("Operator is Vodafone")
+                                stdin, stdout, stderr = self.client.exec_command("/interface lte set lte1 pin=1234")
+                                result = stdout.read().decode()
+                                print(f"PIN was set to: 1234 {result}")
+                                time.sleep(10)
+                                
+                                
+                                
+                                
+                                if self.is_router_online():
+                                    print("Router is online.")
+                                else:
+                                    print("Router is offline.")
+                                    time.sleep(5)
+                                    self.update_firmware()
+                                    
+                                # y = 20
+                                # for x in range(19):
+                                #     y -= 1
+                                #     print(f"{y}s")
+                                #     time.sleep(1)
+                                
+
+                                
+                                # #Deaktivace PINu
+                                # stdin, stdout, stderr = self.client.exec_command("/interface lte set lte1 pin=\"\"")
+                                # result = stdout.read().decode()
+                                # print(result)
+                                # time.sleep(1)
+                                
+                                
+                            except:
+                                print("Nepovedlo se nastavit pin")
+
+
+                            
+                        
+                        
                         print("Upgrading router")
                         
                         stdin, stdout, stderr = self.client.exec_command("system package update set channel=test") 
                         result = stdout.read().decode()
-                        print("step 1/6 - Version set to Test")
+                        print("update step 1/6 - Version set to Test")
                         if "failed" in result.lower():
                             raise Exception("Setting channel to testing failed.")
                         time.sleep(2)
 
                         stdin, stdout, stderr = self.client.exec_command("system package update check-for-updates")
                         result = stdout.read().decode()
-                        print("step 2/6 - Checked for updates")
+                        print("uprate step 2/6 - Checked for updates")
                         print(result)
                         if "failed" in result.lower():
                             raise Exception("Checking for updates failed.")
@@ -377,7 +431,7 @@ class Router():
                         
                         stdin, stdout, stderr = self.client.exec_command("system package update download")
                         result = stdout.read().decode()
-                        print("step 3/6 - Updates downloaded")
+                        print("update step 3/6 - Updates downloaded")
                         print(result)
                         if "failed" in result.lower():
                             raise Exception("Downloading updates failed.")
@@ -385,7 +439,7 @@ class Router():
 
                         stdin, stdout, stderr = self.client.exec_command("system routerboard upgrade")
                         result = stdout.read().decode()
-                        print("step 4/6 - Router upgraded. Going to reboot")
+                        print("update step 4/6 - Router upgraded. Going to reboot")
                         print(result)
                         
                         if "failed" in result.lower():
@@ -605,7 +659,7 @@ class Router():
                 time.sleep(2)    
                 
                 
-                print(f"Good JOB, router is prepare for production, do not forget for printing the stick with name: {self.file_name}   #######")
+                print(f"/nGood JOB, router is prepare for production, do not forget for printing the stick with name/n")
                 
                 # reboot
                 stdin, stdout, stderr = self.client.exec_command("reboot")
@@ -689,49 +743,6 @@ class Router():
 
 
 
-
-    # def dhcp_setup(self):
-
-        
-       
-
-
-
-
-
-
-
-
-
-####### PROGRAM #########
-
-
-# # Create an instance of the Program class
-# router = Router("10.100.0.10")
-# router.get_dhcp_devices()
-
-
-## Import dokumentu ###
-# with open("report_po_upgradu.csv") as csv: # importuje soubor
-
-# with open("Migrace_MBS/logs/archiv/report_po_upgradu.csv") as csv: # importuje soubor
-#     # print(csv.readline()) # přečte a ignoruje první řádek
-#     for x in csv.readlines(): # přečte postupně řádky
-#         data = x.split(",") # udělá u toho list a rozdělí ho
-#         ip = data[0]
-#         ip = ip.strip() # naplní objekt daty ze souboru
-#         ip_nase = data[1]
-#         mac = data[2]
-#         mac = mac.strip()
-#         # if mac != "None" and ip_nase == "None":
-        
-#         # print(ip)
-#         rpi = Router(ip)
-#         rpi.get_dhcp_devices()
-#             # dalsi_router = input("Pokračovat na další router? (Pokud ne, NO)\n")
-#             # if dalsi_router == "NO" or dalsi_router == "N" or dalsi_router == "n":
-#             #     break
-       
 
 
 

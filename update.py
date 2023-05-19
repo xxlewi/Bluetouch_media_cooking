@@ -1,10 +1,17 @@
 
-
+import sys
 from router import Router
 
 ip_router = "192.168.88.1"
 
-router = Router(ip_router)
+
+
+if len(sys.argv) > 1:
+    operator = sys.argv[1]
+else:
+    operator = None
+
+router = Router(ip_router, operator)
 
 
 # router.connecting()
